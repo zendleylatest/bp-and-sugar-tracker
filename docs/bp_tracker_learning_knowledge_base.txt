@@ -1,0 +1,46 @@
+Blood Pressure & Sugar Tracker Knowledge Base
+
+Q: What is Blood Pressure & Sugar Tracker?
+A: Blood Pressure & Sugar Tracker is a personal health tracking app for logging blood pressure, blood sugar, BMI, medications, and health reports.
+
+Q: What can users track in the app?
+A: Users can track blood pressure readings, glucose readings, BMI data, medication details, reminders, and report history.
+
+Q: Is the app a medical device?
+A: No. The app helps users record and understand their own health data, but it does not diagnose conditions, prescribe treatment, or replace professional medical advice.
+
+Q: What should users do if readings are very high, very low, or symptoms are severe?
+A: Users should contact a qualified clinician or seek urgent medical care when readings are concerning, symptoms are severe, or they are unsure what to do.
+
+Q: What does Premium unlock?
+A: Premium removes ads and unlocks unlimited reports and full data access.
+
+Q: What are the free user limits?
+A: Guest users can use 2 actions per limited feature. Signed-in free users can use 5. BMI entries, blood pressure entries, blood glucose entries, reports, and full-data access are tracked separately. Premium users have unlimited access.
+
+Q: What happens when a free user reaches a limit?
+A: The app shows a Premium upgrade modal and asks the user to upgrade to continue using the limited feature.
+
+Q: Why should users sign in?
+A: Signing in lets the app connect Premium subscriptions to the user's account email and sync access across devices.
+
+Q: Can users continue as guests?
+A: Yes. Guests can enter the app, but subscriptions and Premium access require a signed-in account.
+
+Q: How are subscriptions verified?
+A: Subscription purchases are verified by the backend against the signed-in user account before Premium is unlocked.
+
+Q: Does Premium remove ads?
+A: Yes. Ads are disabled for users with active Premium access.
+
+Q: Where can users see Premium status?
+A: Premium status is shown in the app bar and profile with Pro indicators.
+
+Q: Can users restore purchases?
+A: Yes. Signed-in users can restore purchases from the Premium screen.
+
+Q: Can the app guarantee health improvements?
+A: No. The app supports tracking and reporting, but outcomes depend on the user's health, care plan, and clinician guidance.
+
+Q: Should users change medication based only on the app?
+A: No. Users should not change medication, dosage, or treatment plans without advice from a qualified clinician.

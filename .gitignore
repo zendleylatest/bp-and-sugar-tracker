@@ -1,0 +1,14 @@
+# Node modules
+node_modules/
+
+# Logs
+logs/
+*.log
+
+# Env files
+.env
+firebase-service-account.json
+
+# OS files
+.DS_Store
+Thumbs.db
