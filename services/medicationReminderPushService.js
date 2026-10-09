@@ -13,6 +13,7 @@ const PUSH_TTL_MS = GRACE_MINUTES * 60 * 1000;
 const SWEEP_INTERVAL_MS = 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_SENT_SLOTS = 200;
+const warnedSlots = new Set();
 const DEFAULT_DEBUG_DELAY_SECONDS = 60;
 const MAX_DEBUG_DELAY_SECONDS = 60 * 60;
 const ANDROID_PACKAGE = process.env.ANDROID_PACKAGE_NAME || "com.sugur.blood.playstore";
@@ -119,7 +120,8 @@ async function sendPushToUser(userId, { title, body, data = {} }) {
 
   const user = await User.findById(userId).select("deviceTokens isBanned");
   if (!user || user.isBanned) return { sent: 0, reason: "no_user" };
-  const tokens = (user.deviceTokens || []).map((d) => d.token).filter(Boolean);
+  // Unique: duplicate stored tokens would each deliver a copy of the push.
+  const tokens = [...new Set((user.deviceTokens || []).map((d) => d.token).filter(Boolean))];
   if (!tokens.length) return { sent: 0, reason: "no_tokens" };
 
   const expirySeconds = Math.floor((Date.now() + PUSH_TTL_MS) / 1000);
@@ -145,6 +147,9 @@ async function sendPushToUser(userId, { title, body, data = {} }) {
 
   const dead = [];
   response.responses.forEach((r, i) => {
+    if (!r.success) {
+      console.warn(`[medication-reminder] FCM error for a device token: ${r.error?.code} ${r.error?.message}`);
+    }
     if (!r.success && INVALID_TOKEN_CODES.has(r.error?.code)) dead.push(tokens[i]);
   });
   if (dead.length) {
@@ -197,7 +202,17 @@ async function sweepMedicationReminders({
         });
         if (result.sent > 0) {
           summary.sent += 1;
+          console.log(
+            `[medication-reminder] pushed "${medicine.name}" slot=${slot} user=${doc.userId} devices=${result.sent}`
+          );
         } else {
+          // Retries every sweep inside the grace window; log each slot once.
+          if (!warnedSlots.has(slot)) {
+            warnedSlots.add(slot);
+            console.warn(
+              `[medication-reminder] NOT delivered "${medicine.name}" slot=${slot} user=${doc.userId} reason=${result.reason || `fcm_failed(${result.failed || 0})`} (will retry until ${GRACE_MINUTES} min after the set time)`
+            );
+          }
           await release(doc, slot);
         }
       } catch (err) {

@@ -69,25 +69,36 @@ async function registerToken(req, res) {
         });
       }
 
-      const existingIndex = (mongoUser.deviceTokens || []).findIndex((d) => d.token === token);
-      if (existingIndex >= 0) {
-        mongoUser.deviceTokens[existingIndex].deviceType =
-          deviceType || mongoUser.deviceTokens[existingIndex].deviceType;
-        mongoUser.deviceTokens[existingIndex].deviceInfo = {
-          ...mongoUser.deviceTokens[existingIndex].deviceInfo,
-          ...deviceInfo,
-        };
-        mongoUser.deviceTokens[existingIndex].registeredAt = new Date();
-      } else {
-        mongoUser.deviceTokens.push({
-          token,
-          deviceType,
-          deviceInfo,
-          registeredAt: new Date(),
-        });
+      // Atomic upsert: concurrent registrations of the same token (app start +
+      // token refresh) must not store it twice, or every push is delivered twice.
+      const updated = await User.updateOne(
+        { _id: mongoUser._id, "deviceTokens.token": token },
+        {
+          $set: {
+            "deviceTokens.$.deviceType": deviceType,
+            "deviceTokens.$.deviceInfo": deviceInfo,
+            "deviceTokens.$.registeredAt": new Date(),
+          },
+        }
+      );
+      if (updated.matchedCount === 0) {
+        await User.updateOne(
+          { _id: mongoUser._id, "deviceTokens.token": { $ne: token } },
+          { $push: { deviceTokens: { token, deviceType, deviceInfo, registeredAt: new Date() } } }
+        );
       }
-
-      await mongoUser.save();
+      // Collapse any duplicates already stored from earlier races.
+      const fresh = await User.findById(mongoUser._id);
+      const seen = new Set();
+      const unique = (fresh.deviceTokens || []).filter((d) => !seen.has(d.token) && seen.add(d.token));
+      if (unique.length !== (fresh.deviceTokens || []).length) {
+        fresh.deviceTokens = unique;
+        await fresh.save();
+      }
+      mongoUser = fresh;
+      console.log(
+        `[notification:registerToken] stored on user=${mongoUser._id} device=${deviceType} tokens=${mongoUser.deviceTokens.length}`
+      );
 
       try {
         await PushDeviceToken.deleteOne({ token });
@@ -104,6 +115,9 @@ async function registerToken(req, res) {
       });
     }
 
+    console.warn(
+      "[notification:registerToken] no signed-in user on this request; token stored standalone (reminders need it on the user)"
+    );
     await upsertStandaloneToken({
       token,
       labelUserId: bodyUserIdRaw || null,

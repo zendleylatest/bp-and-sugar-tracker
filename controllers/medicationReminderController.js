@@ -1,4 +1,5 @@
 const MedicationReminder = require("../models/medicationReminderModel");
+const User = require("../models/usersModel");
 const {
   debugRemindersEnabled,
   scheduleDebugReminder,
@@ -70,14 +71,38 @@ async function saveMedicationReminders(req, res) {
     const language = String(req.body?.languageCode || "").toLowerCase().split(/[-_]/)[0];
     const languageUpdate = /^[a-z]{2}$/.test(language) ? { languageCode: language } : {};
 
-    await MedicationReminder.findOneAndUpdate(
+    const received = req.body.medicines.length;
+    const record = await MedicationReminder.findOneAndUpdate(
       { userId: req.authUser._id },
       { $set: { medicines, ...offsetUpdate, ...languageUpdate } },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
+
+    const user = await User.findById(req.authUser._id).select("deviceTokens").lean();
+    const tokenCount = (user?.deviceTokens || []).length;
+    console.log(
+      `[medication-reminder] saved OK user=${req.authUser._id} medicines=${medicines.length}/${received} ` +
+        `utcOffset=${record.utcOffsetMinutes} lang=${record.languageCode} deviceTokens=${tokenCount}`
+    );
+    for (const m of medicines) {
+      console.log(
+        `[medication-reminder]   - "${m.name}" start=${m.startDate} duration=${m.duration} ` +
+          `days=${m.weekDays.join(",") || "(start day)"} times=${m.times.join(",")}`
+      );
+    }
+    if (medicines.length < received) {
+      console.warn(
+        `[medication-reminder] ${received - medicines.length} medicine(s) rejected (invalid id/name/date/time)`
+      );
+    }
+    if (!tokenCount) {
+      console.warn(
+        `[medication-reminder] user=${req.authUser._id} has NO device tokens: pushes cannot be delivered until the app registers an FCM token`
+      );
+    }
     return res.json({ success: true, count: medicines.length });
   } catch (err) {
-    console.error("[medication-reminder] save error:", err);
+    console.error("[medication-reminder] save FAILED:", err);
     return res.status(500).json({ error: "Could not save reminders" });
   }
 }
@@ -108,6 +133,9 @@ async function handleDebugMedicationReminder(req, res) {
       req.body?.delaySeconds,
       record?.medicines?.[0] || { name: "your medicine" },
       record?.languageCode
+    );
+    console.log(
+      `[medication-reminder] debug test push scheduled for user=${req.authUser._id} at ${scheduled.fireAt}`
     );
     return res.status(202).json({ success: true, ...scheduled });
   } catch (err) {
