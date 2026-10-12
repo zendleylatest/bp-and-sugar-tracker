@@ -3,11 +3,12 @@ function parseLimit(value, fallback) {
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
 }
 
-const GUEST_CHAT_LIMIT = parseLimit(process.env.CARE_FREE_CHAT_LIMIT, 2);
+// Guests and signed-up users share the same free chat limit; Premium is unlimited.
 const REGISTERED_CHAT_LIMIT = parseLimit(
   process.env.CARE_REGISTERED_CHAT_LIMIT,
   5
 );
+const GUEST_CHAT_LIMIT = REGISTERED_CHAT_LIMIT;
 
 function computeUserIsPro(user) {
   if (user?.isPro) return true;

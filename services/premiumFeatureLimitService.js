@@ -1,24 +1,12 @@
 const { computeUserIsPro, isGuestUser } = require("./careLimitService");
 
+// Guests and signed-up users share the same free limits (one set of
+// *_LIMIT values); only Premium is unlimited.
 function parseLimit(value, fallback) {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
 }
 
-const GUEST_REPORT_LIMIT = parseLimit(process.env.GUEST_REPORT_LIMIT, 2);
-const GUEST_FULL_DATA_ACCESS_LIMIT = parseLimit(
-  process.env.GUEST_FULL_DATA_ACCESS_LIMIT,
-  2
-);
-const GUEST_BMI_ENTRY_LIMIT = parseLimit(process.env.GUEST_BMI_ENTRY_LIMIT, 2);
-const GUEST_BLOOD_PRESSURE_ENTRY_LIMIT = parseLimit(
-  process.env.GUEST_BLOOD_PRESSURE_ENTRY_LIMIT,
-  2
-);
-const GUEST_BLOOD_GLUCOSE_ENTRY_LIMIT = parseLimit(
-  process.env.GUEST_BLOOD_GLUCOSE_ENTRY_LIMIT,
-  2
-);
 const REGISTERED_REPORT_LIMIT = parseLimit(
   process.env.REGISTERED_REPORT_LIMIT || process.env.FREE_REPORT_LIMIT,
   5
@@ -44,27 +32,27 @@ const REGISTERED_BLOOD_GLUCOSE_ENTRY_LIMIT = parseLimit(
 const FEATURE_CONFIG = {
   reports: {
     field: "reportsUsed",
-    guestLimit: GUEST_REPORT_LIMIT,
+    guestLimit: REGISTERED_REPORT_LIMIT,
     registeredLimit: REGISTERED_REPORT_LIMIT,
   },
   fullDataAccess: {
     field: "fullDataAccessUsed",
-    guestLimit: GUEST_FULL_DATA_ACCESS_LIMIT,
+    guestLimit: REGISTERED_FULL_DATA_ACCESS_LIMIT,
     registeredLimit: REGISTERED_FULL_DATA_ACCESS_LIMIT,
   },
   bmiEntries: {
     field: "bmiEntriesUsed",
-    guestLimit: GUEST_BMI_ENTRY_LIMIT,
+    guestLimit: REGISTERED_BMI_ENTRY_LIMIT,
     registeredLimit: REGISTERED_BMI_ENTRY_LIMIT,
   },
   bloodPressureEntries: {
     field: "bloodPressureEntriesUsed",
-    guestLimit: GUEST_BLOOD_PRESSURE_ENTRY_LIMIT,
+    guestLimit: REGISTERED_BLOOD_PRESSURE_ENTRY_LIMIT,
     registeredLimit: REGISTERED_BLOOD_PRESSURE_ENTRY_LIMIT,
   },
   bloodGlucoseEntries: {
     field: "bloodGlucoseEntriesUsed",
-    guestLimit: GUEST_BLOOD_GLUCOSE_ENTRY_LIMIT,
+    guestLimit: REGISTERED_BLOOD_GLUCOSE_ENTRY_LIMIT,
     registeredLimit: REGISTERED_BLOOD_GLUCOSE_ENTRY_LIMIT,
   },
 };
