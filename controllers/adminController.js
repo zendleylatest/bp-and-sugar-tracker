@@ -55,6 +55,14 @@ async function getUsers(req, res) {
           remaining: isPro ? null : Math.max(0, limit - used),
           hardLocked: !isPro && used >= limit,
         },
+        // App-specific free-tier usage (reports, entries, full data access).
+        premiumFeatureUsage: {
+          reportsUsed: Number(u.premiumFeatureUsage?.reportsUsed) || 0,
+          fullDataAccessUsed: Number(u.premiumFeatureUsage?.fullDataAccessUsed) || 0,
+          bmiEntriesUsed: Number(u.premiumFeatureUsage?.bmiEntriesUsed) || 0,
+          bloodPressureEntriesUsed: Number(u.premiumFeatureUsage?.bloodPressureEntriesUsed) || 0,
+          bloodGlucoseEntriesUsed: Number(u.premiumFeatureUsage?.bloodGlucoseEntriesUsed) || 0,
+        },
         openAiUsage: {
           promptTokens: Number(u.openAiUsage?.promptTokens) || 0,
           completionTokens: Number(u.openAiUsage?.completionTokens) || 0,

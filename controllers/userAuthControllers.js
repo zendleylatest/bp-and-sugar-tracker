@@ -111,6 +111,13 @@ async function handleVerifyOTP(req, res) {
       return res.status(400).json({ error: USER_NOT_FOUND });
     }
 
+    if (user.isBanned) {
+      return res.status(403).json({
+        error: "Your account has been banned. Please contact support.",
+        bannedReason: user.bannedReason || "",
+      });
+    }
+
     if (user.otp !== String(otp).trim()) {
       return res.status(400).json({ error: INVALID_OTP });
     }

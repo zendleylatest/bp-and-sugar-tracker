@@ -5,6 +5,7 @@ const ChatUsage = require("../models/chatUsageModel");
 const User = require("../models/usersModel");
 const { NETWORK_ERROR, INVALID_ID, NOT_FOUND } = require("../messages/message");
 const { verifyIapPurchase } = require("../services/iapVerificationService");
+const { getMergedKnowledgeText } = require("../services/knowledgeStoreService");
 const {
   buildCareLimitConfig,
   computeUserIsPro,
@@ -306,7 +307,24 @@ async function callOpenAI(messages, deviceContext) {
     throw e;
   }
 
-  const systemPrompt = buildSystemPrompt(deviceContext);
+  let systemPrompt = buildSystemPrompt(deviceContext);
+  // Extra app knowledge curated in the admin hub (AI Learning). Best-effort:
+  // a failure here must never break chat.
+  try {
+    const knowledgeText = (await getMergedKnowledgeText())?.trim();
+    if (knowledgeText) {
+      systemPrompt += `
+
+════════════════════════════════════════
+APP KNOWLEDGE BASE (maintained by the app team)
+════════════════════════════════════════
+Use this to answer questions about the app, its features, plans and policies. It does not override the safety rules above; never use it to diagnose or prescribe.
+
+${knowledgeText}`;
+    }
+  } catch (err) {
+    console.warn("[callOpenAI] knowledge base unavailable:", err.message);
+  }
   console.log("[callOpenAI] model:", getModel());
   console.log("[callOpenAI] deviceContext provided:", !!deviceContext);
   console.log("[callOpenAI] system prompt length:", systemPrompt.length);

@@ -173,3 +173,65 @@ Startup log in `index.js` prints Firebase readiness:
 - Use `GET /api/admin/usage` for abuse detection and top users by token usage.
 - Use `PATCH /api/admin/users/:id/ban` for moderation action.
 - Use `POST /api/admin/notifications/broadcast` for announcements.
+
+## allapps-admin Hub Integration
+
+This backend is managed by the universal admin hub (`allapps-admin`). The hub
+does not own this app's users; it proxies to this backend with a shared key.
+
+### Service-key access
+
+`middlewares/serviceKeyMiddleware.js` (`verifyAdminOrServiceKey`) lets these
+routes accept either an admin JWT or `X-Service-Key: <INTERNAL_SERVICE_KEY>`:
+
+- `GET /api/admin/users`
+- `GET /api/admin/usage`
+- `PATCH /api/admin/users/:id/ban` (also `/toggle`)
+- `PUT /api/admin/users/:id`
+- `POST /api/admin/notifications/broadcast`
+- `POST /api/knowledge` (also accepts `X-Knowledge-Key` = `KNOWLEDGE_API_KEY`)
+
+`GET /api/admin/users` rows include BP-specific `premiumFeatureUsage`
+(reports, full data access, BMI / blood pressure / glucose entries).
+
+### AI Learning (knowledge base)
+
+`/api/knowledge` stores text curated in the hub. `getMergedKnowledgeText()` is
+appended to the chat system prompt in `controllers/chatController.js`
+(`callOpenAI`) and used by the FAQ chat.
+
+### Bans
+
+Enforced with `403` + `bannedReason` in the auth middleware, password login,
+Google login, OTP verification, chat and prompt generation. The Flutter app
+shows an "Account Suspended" dialog.
+
+### Push notifications
+
+The app registers its FCM token **twice**:
+
+1. With the hub (`/api/notifications/register-token`, body has `appSlug` and
+   `firebaseProjectId`, no auth) so the hub can broadcast through the matching
+   Firebase project.
+2. With this backend (same path, with the user's JWT) so medication reminders
+   can be pushed to the user's devices.
+
+Broadcasts carry `targetPackageNames`; the app ignores ones that do not
+include `com.sugur.blood.playstore`.
+
+### Required env vars
+
+- `INTERNAL_SERVICE_KEY` (long random; same value as the hub's `serviceKey`)
+- `KNOWLEDGE_API_KEY` (optional)
+- `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_JWT_SECRET`
+
+### Hub "Apps" page values
+
+| Field | Value |
+| --- | --- |
+| name | Blood Pressure & Sugar Tracker |
+| slug | `bp-sugar-tracker` |
+| packageName | `com.sugur.blood.playstore` |
+| firebaseProjectId | `odl-flutter-apps` |
+| baseUrl | `https://bpandsugartracker.oxmite.com` |
+| serviceKey | the value of `INTERNAL_SERVICE_KEY` on this backend |
