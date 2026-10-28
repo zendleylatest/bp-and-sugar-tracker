@@ -1,3 +1,4 @@
+const { sendBanPush } = require("../services/accountBanPushService");
 const mongoose = require("mongoose");
 const User = require("../models/usersModel");
 const PushDeviceToken = require("../models/pushDeviceTokenModel");
@@ -169,6 +170,9 @@ async function setUserBanState(req, res) {
         message: "User not found",
       });
     }
+
+    // Sign the user out on their devices immediately (fire-and-forget).
+    if (isBanned) sendBanPush(user);
 
     return res.json({
       success: true,

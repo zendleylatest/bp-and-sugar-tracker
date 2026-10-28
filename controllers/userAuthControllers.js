@@ -32,9 +32,13 @@ const {
 } = require("../messages/message");
 const { isGuestUser } = require("../services/careLimitService");
 
-const googleClient = process.env.GOOGLE_CLIENT_ID
-  ? new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
-  : null;
+// GOOGLE_CLIENT_ID may hold several comma-separated OAuth client IDs. The ID
+// token's audience is the Web client ID the app passes as serverClientId.
+const googleAudiences = (process.env.GOOGLE_CLIENT_ID || "")
+  .split(",")
+  .map((id) => id.trim())
+  .filter(Boolean);
+const googleClient = googleAudiences.length ? new OAuth2Client() : null;
 
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 const isValidOTP = (otp) => typeof otp === "string" && /^\d{6}$/.test(otp);
@@ -168,7 +172,7 @@ async function handleUserLogin(req, res) {
 
 async function handleGoogleLogin(req, res) {
   try {
-    if (!googleClient || !process.env.GOOGLE_CLIENT_ID) {
+    if (!googleClient || !googleAudiences.length) {
       return res.status(500).json({ error: "Google sign-in is not configured" });
     }
     const { idToken } = req.body;
@@ -178,7 +182,7 @@ async function handleGoogleLogin(req, res) {
 
     const ticket = await googleClient.verifyIdToken({
       idToken,
-      audience: process.env.GOOGLE_CLIENT_ID,
+      audience: googleAudiences,
     });
 
     const payload = ticket.getPayload();

@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const OpenAI = require("openai");
+const { getOpenAiClient } = require("../services/openAiKeyService");
 const PromptGeneration = require("../models/promptGenerationModel");
 const User = require("../models/usersModel");
 const { getUser } = require("../services/userAuthService");
@@ -39,14 +39,8 @@ Instructions:
 5. Do NOT include explanations, titles, or extra text. 
 6. ⁠Output only the final prompt.`;
 
-function getClient() {
-  const key = process.env.OPENAI_API_KEY;
-  if (!key) {
-    const err = new Error("OPENAI_API_KEY is not configured");
-    err.statusCode = 503;
-    throw err;
-  }
-  return new OpenAI({ apiKey: key });
+async function getClient() {
+  return getOpenAiClient();
 }
 
 function buildUserMessage(body) {
@@ -106,7 +100,7 @@ async function handleGeneratePrompt(req, res) {
 
   let client;
   try {
-    client = getClient();
+    client = await getClient();
   } catch (e) {
     return res.status(e.statusCode || 503).json({ error: e.message });
   }

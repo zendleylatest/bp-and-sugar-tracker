@@ -1,17 +1,16 @@
-const OpenAI = require("openai");
+const { getOpenAiClient } = require("../services/openAiKeyService");
 const ChatUsage = require("../models/chatUsageModel");
 const { getMergedKnowledgeText } = require("../services/knowledgeStoreService");
 
 const MAX_HISTORY_MESSAGES = 10;
 
-let openai = null;
-
-function getOpenAI() {
-  if (openai) return openai;
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
-  if (!apiKey) return null;
-  openai = new OpenAI({ apiKey });
-  return openai;
+async function getOpenAI() {
+  try {
+    return await getOpenAiClient();
+  } catch (e) {
+    console.warn("[faq] OpenAI unavailable:", e.message);
+    return null;
+  }
 }
 
 function getModel() {
@@ -51,7 +50,7 @@ async function faqChat(req, res) {
       }
     }
 
-    const client = getOpenAI();
+    const client = await getOpenAI();
     if (!client) {
       return res.json({
         success: true,

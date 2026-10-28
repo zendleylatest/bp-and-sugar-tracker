@@ -1,10 +1,10 @@
 const mongoose = require("mongoose");
-const OpenAI = require("openai");
 const ChatSession = require("../models/chatModel");
 const ChatUsage = require("../models/chatUsageModel");
 const User = require("../models/usersModel");
 const { NETWORK_ERROR, INVALID_ID, NOT_FOUND } = require("../messages/message");
 const { verifyIapPurchase } = require("../services/iapVerificationService");
+const { getOpenAiClient } = require("../services/openAiKeyService");
 const { getMergedKnowledgeText } = require("../services/knowledgeStoreService");
 const {
   buildCareLimitConfig,
@@ -80,14 +80,8 @@ function deriveTitle(content) {
   return trimmed.length <= 60 ? trimmed : trimmed.slice(0, 57).trimEnd() + "...";
 }
 
-function getChatClient() {
-  const key = process.env.OPENAI_API_KEY;
-  if (!key) {
-    const err = new Error("OPENAI_API_KEY is not configured");
-    err.statusCode = 503;
-    throw err;
-  }
-  return new OpenAI({ apiKey: key });
+async function getChatClient() {
+  return getOpenAiClient();
 }
 
 function getModel() {
@@ -302,7 +296,7 @@ async function handleGetCareLimits(req, res) {
 async function callOpenAI(messages, deviceContext) {
   let client;
   try {
-    client = getChatClient();
+    client = await getChatClient();
   } catch (e) {
     throw e;
   }
