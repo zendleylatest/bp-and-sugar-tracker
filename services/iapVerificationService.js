@@ -20,41 +20,135 @@ function strictVerifyEnabled() {
   );
 }
 
-function loadGoogleServiceAccount() {
-  if (process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON) {
-    try {
-      return JSON.parse(process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON);
-    } catch (e) {
-      console.warn("[iapVerify] Invalid GOOGLE_PLAY_SERVICE_ACCOUNT_JSON");
-    }
+/**
+ * Parses a service account from raw env/file text. Accepts plain JSON, JSON
+ * wrapped in quotes, or base64 of the JSON (easier to paste into hosting env
+ * settings). Repairs a private_key whose newlines were flattened to a literal
+ * "\\n" by the hosting UI, which otherwise makes signing fail.
+ */
+function parseServiceAccount(raw, label) {
+  let text = String(raw || "").trim();
+  if (!text) return null;
+  if (
+    (text.startsWith("'") && text.endsWith("'")) ||
+    (text.startsWith('"') && text.endsWith('"') && !text.startsWith('"{"'))
+  ) {
+    text = text.slice(1, -1);
   }
 
+  let parsed = null;
   try {
-    const p = path.join(__dirname, "..", "google-play-service-account.json");
-    if (fs.existsSync(p)) {
-      return JSON.parse(fs.readFileSync(p, "utf8"));
+    parsed = JSON.parse(text);
+  } catch (_) {
+    try {
+      parsed = JSON.parse(Buffer.from(text, "base64").toString("utf8"));
+    } catch (_) {
+      console.warn(`[iapVerify] ${label} is neither valid JSON nor base64 JSON`);
+      return null;
     }
-  } catch (e) {
-    console.warn("[iapVerify] Could not read google-play-service-account.json:", e.message);
   }
+  if (parsed && typeof parsed.private_key === "string") {
+    parsed.private_key = parsed.private_key.replace(/\\n/g, "\n");
+  }
+  return parsed;
+}
 
+let cachedServiceAccount;
+let cachedServiceAccountSource = "";
+
+function loadGoogleServiceAccount() {
+  if (cachedServiceAccount) return cachedServiceAccount;
+
+  const candidates = [];
+  if (process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON) {
+    candidates.push({
+      label: "GOOGLE_PLAY_SERVICE_ACCOUNT_JSON",
+      read: () => process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON,
+    });
+  }
+  const explicitPath = (process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_PATH || "").trim();
+  if (explicitPath) {
+    candidates.push({
+      label: `GOOGLE_PLAY_SERVICE_ACCOUNT_PATH (${explicitPath})`,
+      // Relative paths resolve against the backend root, not the cwd.
+      read: () => fs.readFileSync(path.resolve(__dirname, "..", explicitPath), "utf8"),
+    });
+  }
+  const defaultPath = path.join(__dirname, "..", "google-play-service-account.json");
+  candidates.push({
+    label: "google-play-service-account.json",
+    read: () => (fs.existsSync(defaultPath) ? fs.readFileSync(defaultPath, "utf8") : ""),
+  });
+
+  for (const c of candidates) {
+    try {
+      const sa = parseServiceAccount(c.read(), c.label);
+      if (sa?.client_email && sa?.private_key) {
+        cachedServiceAccount = sa;
+        cachedServiceAccountSource = c.label;
+        return sa;
+      }
+    } catch (e) {
+      console.warn(`[iapVerify] Could not read ${c.label}:`, e.message);
+    }
+  }
   return null;
 }
+
+let cachedJwtClient = null;
+let cachedJwtEmail = "";
 
 async function getGoogleAccessToken() {
   const sa = loadGoogleServiceAccount();
   if (!sa?.client_email || !sa?.private_key) {
-    throw new Error("Google Play service account is missing");
+    throw new Error(
+      "Google Play service account is missing (set GOOGLE_PLAY_SERVICE_ACCOUNT_JSON, " +
+        "GOOGLE_PLAY_SERVICE_ACCOUNT_PATH, or add google-play-service-account.json)"
+    );
   }
 
-  const client = new JWT({
-    email: sa.client_email,
-    key: sa.private_key,
-    scopes: [GOOGLE_SCOPE],
-  });
-  const { token } = await client.getAccessToken();
+  // Reuse one client so its access token is cached until it expires.
+  if (!cachedJwtClient || cachedJwtEmail !== sa.client_email) {
+    cachedJwtClient = new JWT({
+      email: sa.client_email,
+      key: sa.private_key,
+      scopes: [GOOGLE_SCOPE],
+    });
+    cachedJwtEmail = sa.client_email;
+  }
+  const { token } = await cachedJwtClient.getAccessToken();
   if (!token) throw new Error("Could not create Google Play access token");
   return token;
+}
+
+/**
+ * Logs whether Google Play verification is usable. Call once at startup: it
+ * signs in as the service account (no purchase needed), so a missing or broken
+ * key shows up in the logs immediately instead of on a customer's purchase.
+ */
+async function logGooglePlayVerificationStatus() {
+  const strict = strictVerifyEnabled();
+  const sa = loadGoogleServiceAccount();
+  if (!sa) {
+    console.warn(
+      `[iapVerify] Google Play service account NOT configured. ` +
+        (strict
+          ? "IAP_ANDROID_STRICT_VERIFY is on: Android purchases will be rejected."
+          : "IAP_ANDROID_STRICT_VERIFY is off: Android purchases are accepted WITHOUT verification (fallback_dev).")
+    );
+    return;
+  }
+  try {
+    await getGoogleAccessToken();
+    console.log(
+      `[iapVerify] Google Play verification ready (source=${cachedServiceAccountSource}, ` +
+        `account=${sa.client_email}, strict=${strict}).`
+    );
+  } catch (e) {
+    console.warn(
+      `[iapVerify] Google Play service account found (${sa.client_email}) but sign-in failed: ${e.message}`
+    );
+  }
 }
 
 function buildAndroidSubscriptionResult(data) {
@@ -384,5 +478,6 @@ async function verifyIapPurchase({
 
 module.exports = {
   verifyIapPurchase,
+  logGooglePlayVerificationStatus,
   buildAmazonSubscriptionResult,
 };

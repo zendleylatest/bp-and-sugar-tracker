@@ -12,3 +12,4 @@ firebase-service-account.json
 # OS files
 .DS_Store
 Thumbs.db
+google-play-service*.json

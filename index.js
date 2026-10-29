@@ -20,6 +20,7 @@ const {
   startMedicationReminderScheduler,
 } = require("./services/medicationReminderPushService");
 const { ensureFirebaseAdmin } = require("./utils/firebaseAdminInit");
+const { logGooglePlayVerificationStatus } = require("./services/iapVerificationService");
 // shd
 const mongoUri = process.env.MONGODB_URI;
 if (!mongoUri) {
@@ -183,6 +184,7 @@ MongoDBConnect(mongoUri)
       console.log(`Server listening on port ${port}`);
     });
     startMedicationReminderScheduler();
+    logGooglePlayVerificationStatus();
   })
   .catch(() => process.exit(1));
 
